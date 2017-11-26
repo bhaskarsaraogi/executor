@@ -1,4 +1,4 @@
-package main
+package executor
 
 import (
 	"log"
@@ -19,7 +19,7 @@ type Job struct {
 }
 
 // A buffered channel that we can send work requests on.
-var JobQueue  = make(chan Job)
+var JobQueue = make(chan Job)
 
 // Worker represents the worker that executes the job
 type Worker struct {
@@ -115,24 +115,9 @@ func (e *Executor) dispatchJob() {
 	}
 }
 
-func main()  {
-	executor := NewExecutor(8)
-	executor.Run()
-
-	log.Println("Creating payloads")
-	Payloads := []Payload{Payload{}, Payload{}}
-
-	// Go through each payload and queue items individually for the jon to be executed
-	for _, payload := range Payloads {
-
-		log.Println("Pushing job payload")
-		// let's create a job with the payload
-		work := Job{Payload: payload}
-
-		// Push the work onto the queue.
-		JobQueue <- work
-		log.Println("Job pushed")
-	}
-
+func (e *Executor) QueueJob(job Job)  {
+	JobQueue <- job
 }
+
+
 
