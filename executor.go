@@ -4,18 +4,10 @@ import (
 	"log"
 )
 
-type Payload struct {
-}
-
-
-func (p *Payload) Execute() error {
-	log.Println("Completed job")
-	return nil
-}
 
 // Job represents the job to be run
-type Job struct {
-	Payload Payload
+type Job interface {
+	Execute() error
 }
 
 // A buffered channel that we can send work requests on.
@@ -46,8 +38,8 @@ func (w Worker) Start() {
 			select {
 			case job := <-w.JobChannel:
 				// we have received a work request.
-				if err := job.Payload.Execute(); err != nil {
-					log.Println("Error executing job: %s", err.Error())
+				if err := job.Execute(); err != nil {
+					log.Printf("Error executing job: %s\n", err.Error())
 				}
 
 			case <-w.quit:

@@ -5,19 +5,26 @@ import (
 	"log"
 )
 
+type dummyJobType struct {
+
+}
+
+func (d dummyJobType) Execute() error {
+	log.Println("Task executed")
+	return nil
+}
+
 func main()  {
 	ex := executor.NewExecutor(8)
 	ex.Run()
 
 	log.Println("Creating payloads")
-	payloads := []executor.Payload{{}, {}}
+	jobs := []executor.Job{new(dummyJobType), new(dummyJobType)}
 
-	// Go through each payload and queue items individually for the jon to be executed
-	for _, payload := range payloads {
+	// Go through each job and queue the individually for the job to be executed
+	for _, job := range jobs {
 
 		log.Println("Pushing job payload")
-		// let's create a job with the payload
-		job := executor.Job{Payload: payload}
 
 		// Push the job onto the queue.
 		ex.QueueJob(job)
