@@ -7,7 +7,7 @@ import (
 
 // Job represents the job to be run
 type Job interface {
-	Execute() error
+	Execute(params ...struct{}) error
 }
 
 // A buffered channel that we can send work requests on.

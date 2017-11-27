@@ -9,7 +9,7 @@ type dummyJobType struct {
 
 }
 
-func (d dummyJobType) Execute() error {
+func (d dummyJobType) Execute(...struct{}) error {
 	log.Println("Task executed")
 	return nil
 }
