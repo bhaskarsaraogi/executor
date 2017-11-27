@@ -57,7 +57,7 @@ func (w Worker) Stop() {
 	}()
 }
 
-
+// Core executor struct, has a WorkerPool channel of all currently available workers as all active workers would have published there JobChannel into the WorkerPool to get next job
 type Executor struct {
 	// A pool of workers channels that are registered with the dispatcher
 	WorkerPool chan chan Job
@@ -65,11 +65,14 @@ type Executor struct {
 	Workers []Worker
 }
 
+// Create new executor instance
+// maxWorkers specify the number of workers/agents(underneath goroutines) one would like to spawn, general idea to have as many as the number of cpu available
 func NewExecutor(maxWorkers int) *Executor {
 	pool := make(chan chan Job, maxWorkers)
 	return &Executor{WorkerPool: pool, MaxWorkers: maxWorkers}
 }
 
+// Start all workers on executor
 func (e *Executor) Run() {
 	// starting n number of workers
 	for i := 0; i < e.MaxWorkers; i++ {
@@ -81,6 +84,8 @@ func (e *Executor) Run() {
 	go e.dispatchJob()
 }
 
+
+// Stop all workers on execute
 func (e *Executor) Abort() {
 
 	// Stop all workers
@@ -89,6 +94,7 @@ func (e *Executor) Abort() {
 	}
 }
 
+// background job to listen for new incoming jobs on JobQueue and dispatch them to a available worker from WorkerPool
 func (e *Executor) dispatchJob() {
 	for {
 		select {
@@ -107,6 +113,7 @@ func (e *Executor) dispatchJob() {
 	}
 }
 
+// push job to the global JobQueue or bus
 func (e *Executor) QueueJob(job Job)  {
 	JobQueue <- job
 }

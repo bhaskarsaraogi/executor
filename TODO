@@ -3,3 +3,4 @@
 [ ] complete examples
 [ ] make library generic
 [ ] add golang doc
+[ ] add method to scale up and scale down workers

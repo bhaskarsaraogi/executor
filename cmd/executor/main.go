@@ -9,6 +9,8 @@ type dummyJobType struct {
 
 }
 
+// implement Job interface
+// the argument is variadic to provide flexibility to add external params needed for execution of job
 func (d dummyJobType) Execute(...struct{}) error {
 	log.Println("Task executed")
 	return nil
