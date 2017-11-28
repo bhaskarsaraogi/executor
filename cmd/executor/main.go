@@ -30,9 +30,6 @@ func main()  {
 	ex.Abort()
 
 	log.Println("Sent quit signal")
-
-	time.Sleep(time.Millisecond * 250)
-
 }
 
 func spawnJobs(ex *executor.Executor) {

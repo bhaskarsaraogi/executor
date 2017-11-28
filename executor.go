@@ -2,6 +2,7 @@ package executor
 
 import (
 	"log"
+	"github.com/pkg/errors"
 )
 
 
@@ -15,13 +16,15 @@ var JobQueue = make(chan Job)
 
 // Worker represents the worker that executes the job
 type Worker struct {
+	Id int
 	WorkerPool  chan chan Job
 	JobChannel  chan Job
 	quit    	chan bool
 }
 
-func NewWorker(workerPool chan chan Job) Worker {
-	return Worker{
+func NewWorker(id int, workerPool chan chan Job) *Worker {
+	return &Worker{
+		Id: id,
 		WorkerPool: workerPool,
 		JobChannel: make(chan Job),
 		quit:       make(chan bool)}
@@ -66,7 +69,7 @@ type Executor struct {
 	// A pool of workers channels that are registered with the dispatcher
 	WorkerPool chan chan Job
 	MaxWorkers int
-	Workers []Worker
+	Workers []*Worker
 }
 
 // Create new executor instance
@@ -79,8 +82,8 @@ func NewExecutor(maxWorkers int) *Executor {
 // Start all workers on executor
 func (e *Executor) Run() {
 	// starting n number of workers
-	for i := 0; i < e.MaxWorkers; i++ {
-		worker := NewWorker(e.WorkerPool)
+	for i := 1; i <= e.MaxWorkers; i++ {
+		worker := NewWorker(i, e.WorkerPool)
 		e.Workers = append(e.Workers, worker)
 		worker.Start()
 	}
@@ -93,9 +96,9 @@ func (e *Executor) Run() {
 func (e *Executor) Abort() {
 
 	// Stop all workers
-	for _, Worker := range e.Workers {
+	for _, worker := range e.Workers {
 		log.Println("Stopping worker")
-		Worker.Stop()
+		worker.Stop()
 	}
 }
 
@@ -126,5 +129,13 @@ func (e *Executor) QueueJob(job Job)  {
 	JobQueue <- job
 }
 
-
+// rescale the executor worker pool
+func (e *Executor) ReScale(maxWorkers int) error {
+	if maxWorkers <= 0 {
+		return errors.New("Inavlid value for maxWorkers")
+	} else if e.MaxWorkers != maxWorkers {
+		// TODO implement this
+	}
+	return nil
+}
 
