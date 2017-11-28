@@ -36,9 +36,7 @@ func (w Worker) Start() {
 	go func() {
 		for {
 			// register the current worker into the worker queue.
-			log.Println("adding job channel to pool")
 			w.WorkerPool <- w.JobChannel
-			log.Println("added job channel to pool")
 
 			select {
 			case job := <-w.JobChannel:
@@ -67,22 +65,22 @@ func (w Worker) Stop() {
 // Core executor struct, has a WorkerPool channel of all currently available workers as all active workers would have published there JobChannel into the WorkerPool to get next job
 type Executor struct {
 	// A pool of workers channels that are registered with the dispatcher
-	WorkerPool chan chan Job
-	MaxWorkers int
-	Workers []*Worker
+	WorkerPool  chan chan Job
+	WorkerCount int
+	Workers     []*Worker
 }
 
 // Create new executor instance
 // maxWorkers specify the number of workers/agents(underneath goroutines) one would like to spawn, general idea to have as many as the number of cpu available
-func NewExecutor(maxWorkers int) *Executor {
-	pool := make(chan chan Job, maxWorkers)
-	return &Executor{WorkerPool: pool, MaxWorkers: maxWorkers}
+func NewExecutor(workers int) *Executor {
+	pool := make(chan chan Job, workers)
+	return &Executor{WorkerPool: pool, WorkerCount: workers}
 }
 
 // Start all workers on executor
 func (e *Executor) Run() {
 	// starting n number of workers
-	for i := 1; i <= e.MaxWorkers; i++ {
+	for i := 1; i <= e.WorkerCount; i++ {
 		worker := NewWorker(i, e.WorkerPool)
 		e.Workers = append(e.Workers, worker)
 		worker.Start()
@@ -111,12 +109,9 @@ func (e *Executor) dispatchJob() {
 			go func(job Job) {
 				// try to obtain a worker job channel that is available.
 				// this will block until a worker is idle
-				log.Println("recvd job waiting for job channel")
 				jobChannel := <-e.WorkerPool
-				log.Println("got job channel")
 
 				// dispatchJob the job to the worker job channel
-				log.Println("pushing to job channel")
 				jobChannel <- job
 				log.Println("pushed to job channel")
 			}(job)
@@ -130,11 +125,33 @@ func (e *Executor) QueueJob(job Job)  {
 }
 
 // rescale the executor worker pool
-func (e *Executor) ReScale(maxWorkers int) error {
-	if maxWorkers <= 0 {
-		return errors.New("Inavlid value for maxWorkers")
-	} else if e.MaxWorkers != maxWorkers {
-		// TODO implement this
+func (e *Executor) ReScale(workers int) error {
+	// TODO add any given point of time not more than one call to this should be allowed
+
+	if workers <= 0 {
+		return errors.New("Inavlid value for workers")
+	} else if e.WorkerCount != workers {
+
+		if e.WorkerCount < workers {
+			// add workers as current workers is less than max workers
+			for i := e.WorkerCount; i <= e.WorkerCount+ (workers- e.WorkerCount); i++ {
+				worker := NewWorker(i, e.WorkerPool)
+				e.Workers = append(e.Workers, worker)
+				worker.Start()
+			}
+
+		} else {
+			// reduce worker from here
+			for i := 0; i < workers - e.WorkerCount; i++ {
+				e.Workers[0].Stop()
+				e.Workers = append(e.Workers[:i], e.Workers[i+1:]...)
+			}
+
+		}
+
+		// set the new worker count after resize
+		e.WorkerCount = workers
+
 	}
 	return nil
 }
