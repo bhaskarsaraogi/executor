@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/bhaskarsaraogi/executor"
 	"log"
+	"time"
 )
 
 type dummyJobType struct {
@@ -21,16 +22,22 @@ func main()  {
 	ex.Run()
 
 	log.Println("Creating payloads")
-	jobs := []executor.Job{new(dummyJobType), new(dummyJobType)}
 
 	// Go through each job and queue the individually for the job to be executed
-	for _, job := range jobs {
+	go spawnJobs(ex)
 
-		log.Println("Pushing job payload")
+	time.Sleep(time.Millisecond * 150)
+	ex.Abort()
 
+	log.Println("Sent quit signal")
+
+	time.Sleep(time.Millisecond * 250)
+
+}
+
+func spawnJobs(ex *executor.Executor) {
+	for {
 		// Push the job onto the queue.
-		ex.QueueJob(job)
-		log.Println("Job pushed")
+		ex.QueueJob(new(dummyJobType))
 	}
-
 }

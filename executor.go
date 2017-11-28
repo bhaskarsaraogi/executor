@@ -33,10 +33,13 @@ func (w Worker) Start() {
 	go func() {
 		for {
 			// register the current worker into the worker queue.
+			log.Println("adding job channel to pool")
 			w.WorkerPool <- w.JobChannel
+			log.Println("added job channel to pool")
 
 			select {
 			case job := <-w.JobChannel:
+				log.Println("recvd job to execute")
 				// we have received a work request.
 				if err := job.Execute(); err != nil {
 					log.Printf("Error executing job: %s\n", err.Error())
@@ -44,6 +47,7 @@ func (w Worker) Start() {
 
 			case <-w.quit:
 				// we have received a signal to stop
+				log.Println("recvd quit signal on worker")
 				return
 			}
 		}
@@ -90,6 +94,7 @@ func (e *Executor) Abort() {
 
 	// Stop all workers
 	for _, Worker := range e.Workers {
+		log.Println("Stopping worker")
 		Worker.Stop()
 	}
 }
@@ -100,14 +105,17 @@ func (e *Executor) dispatchJob() {
 		select {
 		case job := <-JobQueue:
 			// a job request has been received
-			log.Println("recvd job to dispatch")
 			go func(job Job) {
 				// try to obtain a worker job channel that is available.
 				// this will block until a worker is idle
+				log.Println("recvd job waiting for job channel")
 				jobChannel := <-e.WorkerPool
+				log.Println("got job channel")
 
 				// dispatchJob the job to the worker job channel
+				log.Println("pushing to job channel")
 				jobChannel <- job
+				log.Println("pushed to job channel")
 			}(job)
 		}
 	}
