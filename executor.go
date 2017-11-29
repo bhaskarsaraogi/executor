@@ -22,7 +22,7 @@ type Worker struct {
 	Id string
 	WorkerPool  chan chan Job
 	JobChannel  chan Job
-	quit    	chan bool
+	quit    	chan struct{}
 }
 
 func NewWorker(id string, workerPool chan chan Job) *Worker {
@@ -30,7 +30,7 @@ func NewWorker(id string, workerPool chan chan Job) *Worker {
 		Id: id,
 		WorkerPool: workerPool,
 		JobChannel: make(chan Job),
-		quit:       make(chan bool)}
+		quit:       make(chan struct{})}
 }
 
 // Start method starts the run loop for the worker, listening for a quit channel in
@@ -65,7 +65,7 @@ func (w *Worker) String() string {
 func (w Worker) Stop() {
 	go func() {
 		log.Println("Stopping: ", w.Id)
-		w.quit <- true
+		close(w.quit)
 	}()
 }
 
@@ -122,7 +122,7 @@ func (e *Executor) pushToWorker(job Job) {
 
 	// recover from panic if job channel is closed while pushing the job
 	defer func() {
-		if err := recover(); err!=nil {
+		if recover() != nil {
 			log.Println("Error occured pushing to job channel, retry!")
 			e.pushToWorker(job)
 		}
