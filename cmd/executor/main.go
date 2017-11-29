@@ -25,46 +25,34 @@ func main()  {
 	// Go through each job and queue the individually for the job to be executed
 	go spawnJobs(ex)
 
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second*10)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
+	info()
 
 	ex.ReScale(2)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second*10)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-
+	info()
 
 	ex.ReScale(4)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second*10)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
+	info()
 
 	ex.ReScale(8)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second*10)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
+	info()
 
 	ex.ReScale(6)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second*10)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
+	info()
 
 	ex.ReScale(3)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second*10)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-
+	info()
 
 	ex.ReScale(1)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second*10)
-	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-
+	info()
 
 	ex.Abort()
 
 	log.Println("Sent quit signal")
+}
+func info() {
+	log.Println("GOROUTINES: ", runtime.NumGoroutine())
+	time.Sleep(time.Second * 10)
+	log.Println("GOROUTINES: ", runtime.NumGoroutine())
 }
 
 func spawnJobs(ex *executor.Executor) {
