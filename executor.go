@@ -3,6 +3,9 @@ package executor
 import (
 	"log"
 	"github.com/pkg/errors"
+	"io"
+	"fmt"
+	"crypto/rand"
 )
 
 
@@ -16,13 +19,13 @@ var JobQueue = make(chan Job)
 
 // Worker represents the worker that executes the job
 type Worker struct {
-	Id int
+	Id string
 	WorkerPool  chan chan Job
 	JobChannel  chan Job
 	quit    	chan bool
 }
 
-func NewWorker(id int, workerPool chan chan Job) *Worker {
+func NewWorker(id string, workerPool chan chan Job) *Worker {
 	return &Worker{
 		Id: id,
 		WorkerPool: workerPool,
@@ -40,7 +43,6 @@ func (w Worker) Start() {
 
 			select {
 			case job := <-w.JobChannel:
-				log.Println("recvd job to execute")
 				// we have received a work request.
 				if err := job.Execute(); err != nil {
 					log.Printf("Error executing job: %s\n", err.Error())
@@ -48,16 +50,21 @@ func (w Worker) Start() {
 
 			case <-w.quit:
 				// we have received a signal to stop
-				log.Println("recvd quit signal on worker")
+				close(w.JobChannel)
 				return
 			}
 		}
 	}()
 }
 
+func (w *Worker) String() string {
+	return w.Id
+}
+
 // Stop signals the worker to stop listening for work requests.
 func (w Worker) Stop() {
 	go func() {
+		log.Println("Stopping: ", w.Id)
 		w.quit <- true
 	}()
 }
@@ -81,7 +88,7 @@ func NewExecutor(workers int) *Executor {
 func (e *Executor) Run() {
 	// starting n number of workers
 	for i := 1; i <= e.WorkerCount; i++ {
-		worker := NewWorker(i, e.WorkerPool)
+		worker := NewWorker(newUUID(), e.WorkerPool)
 		e.Workers = append(e.Workers, worker)
 		worker.Start()
 	}
@@ -106,17 +113,27 @@ func (e *Executor) dispatchJob() {
 		select {
 		case job := <-JobQueue:
 			// a job request has been received
-			go func(job Job) {
-				// try to obtain a worker job channel that is available.
-				// this will block until a worker is idle
-				jobChannel := <-e.WorkerPool
-
-				// dispatchJob the job to the worker job channel
-				jobChannel <- job
-				log.Println("pushed to job channel")
-			}(job)
+			go e.pushToWorker(job)
 		}
 	}
+}
+
+func (e *Executor) pushToWorker(job Job) {
+
+	// recover from panic if job channel is closed while pushing the job
+	defer func() {
+		if err := recover(); err!=nil {
+			log.Println("Error occured pushing to job channel, retry!")
+			e.pushToWorker(job)
+		}
+	}()
+
+	// try to obtain a worker job channel that is available.
+	// this will block until a worker is idle
+	jobChannel := <-e.WorkerPool
+
+	// dispatchJob the job to the worker job channel
+	jobChannel <- job
 }
 
 // push job to the global JobQueue or bus
@@ -134,18 +151,29 @@ func (e *Executor) ReScale(workers int) error {
 
 		if e.WorkerCount < workers {
 			// add workers as current workers is less than max workers
-			for i := e.WorkerCount; i <= e.WorkerCount+ (workers- e.WorkerCount); i++ {
-				worker := NewWorker(i, e.WorkerPool)
+
+			log.Println("Scaling up workers")
+
+			for i := e.WorkerCount; i < e.WorkerCount+ (workers- e.WorkerCount); i++ {
+				worker := NewWorker(newUUID(), e.WorkerPool)
 				e.Workers = append(e.Workers, worker)
 				worker.Start()
 			}
 
 		} else {
 			// reduce worker from here
-			for i := 0; i < workers - e.WorkerCount; i++ {
-				e.Workers[0].Stop()
-				e.Workers = append(e.Workers[:i], e.Workers[i+1:]...)
+
+			log.Println("Scaling down workers")
+
+			for i := 0; i < e.WorkerCount - workers; i++ {
+				e.Workers[i].Stop()
 			}
+
+			var newWorkers []*Worker
+			for i:= e.WorkerCount-workers; i < e.WorkerCount; i++  {
+				newWorkers = append(newWorkers, e.Workers[i])
+			}
+			e.Workers = newWorkers
 
 		}
 
@@ -156,3 +184,17 @@ func (e *Executor) ReScale(workers int) error {
 	return nil
 }
 
+
+// newUUID generates a random UUID according to RFC 4122
+func newUUID() string {
+	uuid := make([]byte, 16)
+	n, err := io.ReadFull(rand.Reader, uuid)
+	if n != len(uuid) || err != nil {
+		return newUUID()
+	}
+	// variant bits; see section 4.1.1
+	uuid[8] = uuid[8]&^0xc0 | 0x80
+	// version 4 (pseudo-random); see section 4.1.3
+	uuid[6] = uuid[6]&^0xf0 | 0x40
+	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:])
+}

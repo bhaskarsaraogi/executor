@@ -1,8 +1,8 @@
-[ ] refactor
+[ ] refactor/cleanup
 [ ] update readme
 [ ] complete examples
 [ ] make library generic
 [ ] add golang doc
-[ ] add method to scale up and scale down workers
+[x] add method to scale up and scale down workers
 [ ] add test
-[ ] close job queue channel if quit
+[x] close job queue channel if quit
