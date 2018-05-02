@@ -3,7 +3,6 @@ package executor
 import (
 	"log"
 	"github.com/pkg/errors"
-	"github.com/google/uuid"
 )
 
 // A buffered channel that we can send work requests on.
@@ -28,8 +27,7 @@ func NewExecutor(workers int) *Executor {
 func (e *Executor) Run() {
 	// starting n number of workers
 	for i := 1; i <= e.WorkerCount; i++ {
-		uuid, _ := uuid.NewUUID() // fixme error case in UUID generation
-		worker := NewWorker(uuid, e.WorkerPool)
+		worker := NewWorker(e.WorkerPool)
 		e.Workers = append(e.Workers, worker)
 		worker.Start()
 	}
@@ -56,6 +54,7 @@ func (e *Executor) dispatchJob() {
 		case job := <-JobQueue:
 			// as more and more pushToWorker are blocked because of contention in workerpool, lot of go routines can get spawned
 			// fixme need to have some form of efficient auto scale up/down, like congestion control
+			// even a small amount of jitter in queuing new jobs is helping, probably would be an overkill ?
 			go e.pushToWorker(job)
 		}
 	}
@@ -100,8 +99,7 @@ func (e *Executor) ReScale(workers int) error {
 			log.Println("Scaling up workers")
 
 			for i := e.WorkerCount; i < e.WorkerCount+ (workers- e.WorkerCount); i++ {
-				uuid, _ := uuid.NewUUID() // fixme error case in UUID generation
-				worker := NewWorker(uuid, e.WorkerPool)
+				worker := NewWorker(e.WorkerPool)
 				e.Workers = append(e.Workers, worker)
 				worker.Start()
 			}

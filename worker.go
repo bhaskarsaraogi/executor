@@ -8,20 +8,20 @@ import (
 // Worker represents the worker that executes the job
 type Worker struct {
 	Id uuid.UUID // unique Id of every worker
-	WorkerPool  WorkerPool // fixme comment
-	JobChannel  JobChannel // fixme comment
+	WorkerPool  WorkerPool // represents the worker pool this worker belongs to
+	JobChannel  JobChannel // jobchannel of worker on which it receives job to execute
 	quit    	chan struct{} // channel to notify worker to stop
 }
 
-
-func NewWorker(id uuid.UUID, workerPool WorkerPool) *Worker {
+// Create new worker using provided UUID, and the worker pool it wants to be part of
+func NewWorker(workerPool WorkerPool) *Worker {
+	uuid, _ := uuid.NewUUID()
 	return &Worker{
-		Id: id,
+		Id: uuid,
 		WorkerPool: workerPool,
 		JobChannel: make(JobChannel),
 		quit:       make(chan struct{})}
 }
-
 
 // Start method starts the run loop for the worker, listening for a quit channel in
 // case we need to stop it
@@ -34,7 +34,7 @@ func (w Worker) Start() {
 			select {
 			case job := <-w.JobChannel:
 				// we have received a work request.
-				if err := job.Execute(); err != nil {
+				if _, err := job.Execute(); err != nil {
 					log.Printf("Error executing job: %s\n", err.Error())
 				}
 

@@ -13,17 +13,18 @@ type dummyJobType struct {
 
 // implement Job interface
 // the argument is variadic to provide flexibility to add external params needed for execution of job
-func (d dummyJobType) Execute(...struct{}) error {
+func (d dummyJobType) Execute(...struct{}) (*struct{}, error) {
 	//log.Println("Task executed")
-	return nil
+	return nil, nil
 }
 
 func main()  {
 	ex := executor.NewExecutor(1)
 	ex.Run()
+	quit := make(chan struct{})
 
 	// Go through each job and queue the individually for the job to be executed
-	go spawnJobs(ex)
+	go spawnJobs(ex, quit)
 
 	info()
 
@@ -45,22 +46,30 @@ func main()  {
 	ex.ReScale(1)
 	info()
 
+	quit <- struct{}{}
 	ex.Abort()
 
 	log.Println("Sent quit signal")
 }
 func info() {
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 4)
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
 }
 
-func spawnJobs(ex *executor.Executor) {
+func spawnJobs(ex *executor.Executor, quit <-chan struct{}) {
 	for {
 		// Push the job onto the queue.
 		ex.QueueJob(new(dummyJobType))
-		time.Sleep(time.Second)
+		//time.Sleep(10*time.Millisecond)
 
-		// fixme send quit signal here
+		select {
+			// encountered quit signal to stop spawning jobs
+			case <-quit:
+				return
+			// continue spawning jobs
+			case <-time.After(10 * time.Millisecond):
+		}
+
 	}
 }
