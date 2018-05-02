@@ -5,13 +5,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// A buffered channel that we can send work requests on.
-var JobQueue = make(JobChannel)
-
 // Core executor struct, has a WorkerPool channel of all currently available workers as all active workers would have published there JobChannel into the WorkerPool to get next job
 type Executor struct {
 	// A pool of workers channels that are registered with the dispatcher
 	WorkerPool  WorkerPool
+	JobQueue JobChannel // A buffered channel that we can send work requests on
 	WorkerCount int
 	Workers     []*Worker
 }
@@ -27,12 +25,10 @@ func NewExecutor(workers int) *Executor {
 func (e *Executor) Run() {
 	// starting n number of workers
 	for i := 1; i <= e.WorkerCount; i++ {
-		worker := NewWorker(e.WorkerPool)
+		worker := NewWorker(&e.WorkerPool, &e.JobQueue)
 		e.Workers = append(e.Workers, worker)
 		worker.Start()
 	}
-
-	go e.dispatchJob()
 }
 
 
@@ -46,43 +42,9 @@ func (e *Executor) Abort() {
 	}
 }
 
-// background job to listen for new incoming jobs on JobQueue and dispatch them to a available worker from WorkerPool
-func (e *Executor) dispatchJob() {
-	for {
-		select {
-		// a job request has been received
-		case job := <-JobQueue:
-			// as more and more pushToWorker are blocked because of contention in workerpool, lot of go routines can get spawned
-			// fixme need to have some form of efficient auto scale up/down, like congestion control
-			// even a small amount of jitter in queuing new jobs is helping, probably would be an overkill ?
-			go e.pushToWorker(job)
-		}
-	}
-}
-
-func (e *Executor) pushToWorker(job Job) {
-
-	// recover from panic if job channel is closed while pushing the job
-	// fixme its a bad construct but reason why we need this
-	defer func() {
-		if recover() != nil {
-			log.Println("Error occured pushing to job channel, retry!")
-			e.pushToWorker(job)
-		}
-	}()
-
-	// try to obtain a worker job channel that is available.
-	// this will block until a worker is idle
-	// fixme what happens when all workers are blocked for a long time, maybe we need to add timeout on job/executor level ?
-	jobChannel := <-e.WorkerPool
-
-	// dispatchJob the job to the worker job channel
-	jobChannel <- job
-}
-
 // push job to the global JobQueue or bus
 func (e *Executor) QueueJob(job Job)  {
-	JobQueue <- job
+	e.JobQueue <- job
 }
 
 // rescale the executor worker pool
@@ -99,7 +61,7 @@ func (e *Executor) ReScale(workers int) error {
 			log.Println("Scaling up workers")
 
 			for i := e.WorkerCount; i < e.WorkerCount+ (workers- e.WorkerCount); i++ {
-				worker := NewWorker(e.WorkerPool)
+				worker := NewWorker(&e.WorkerPool, &e.JobQueue)
 				e.Workers = append(e.Workers, worker)
 				worker.Start()
 			}

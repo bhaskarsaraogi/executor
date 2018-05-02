@@ -24,7 +24,7 @@ func main()  {
 	quit := make(chan struct{})
 
 	// Go through each job and queue the individually for the job to be executed
-	go spawnJobs(ex, quit)
+	go spawnJobs(ex, &quit)
 
 	info()
 
@@ -46,18 +46,19 @@ func main()  {
 	ex.ReScale(1)
 	info()
 
-	quit <- struct{}{}
+	close(quit)
+	log.Println("Quit spawning jobs")
 	ex.Abort()
 
 	log.Println("Sent quit signal")
 }
 func info() {
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second * 4)
+	time.Sleep(time.Second * 3)
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
 }
 
-func spawnJobs(ex *executor.Executor, quit <-chan struct{}) {
+func spawnJobs(ex *executor.Executor, quit *chan struct{}) {
 	for {
 		// Push the job onto the queue.
 		ex.QueueJob(new(dummyJobType))
@@ -65,10 +66,10 @@ func spawnJobs(ex *executor.Executor, quit <-chan struct{}) {
 
 		select {
 			// encountered quit signal to stop spawning jobs
-			case <-quit:
+			case <-*quit:
 				return
 			// continue spawning jobs
-			case <-time.After(10 * time.Millisecond):
+			case <-time.After(time.Millisecond):
 		}
 
 	}

@@ -8,18 +8,18 @@ import (
 // Worker represents the worker that executes the job
 type Worker struct {
 	Id uuid.UUID // unique Id of every worker
-	WorkerPool  WorkerPool // represents the worker pool this worker belongs to
-	JobChannel  JobChannel // jobchannel of worker on which it receives job to execute
+	WorkerPool  *WorkerPool // represents the worker pool this worker belongs to
+	JobChannel  *JobChannel // jobchannel of worker on which it receives job to execute
 	quit    	chan struct{} // channel to notify worker to stop
 }
 
 // Create new worker using provided UUID, and the worker pool it wants to be part of
-func NewWorker(workerPool WorkerPool) *Worker {
+func NewWorker(workerPool *WorkerPool, jobChannel *JobChannel) *Worker {
 	uuid, _ := uuid.NewUUID()
 	return &Worker{
 		Id: uuid,
 		WorkerPool: workerPool,
-		JobChannel: make(JobChannel),
+		JobChannel: jobChannel,
 		quit:       make(chan struct{})}
 }
 
@@ -27,21 +27,14 @@ func NewWorker(workerPool WorkerPool) *Worker {
 // case we need to stop it
 func (w Worker) Start() {
 	go func() {
+
+		// Go over jobs being published and excute, this is fanout, as this jobChannel is Executor jobQueue only
 		for {
-			// register the current worker into the worker queue.
-			w.WorkerPool <- w.JobChannel
-
 			select {
-			case job := <-w.JobChannel:
-				// we have received a work request.
-				if _, err := job.Execute(); err != nil {
-					log.Printf("Error executing job: %s\n", err.Error())
-				}
-
-			case <-w.quit:
-				// we have received a signal to stop
-				close(w.JobChannel)
-				return
+				case <-w.quit:
+					return
+				case job := <-*w.JobChannel:
+					job.Execute()
 			}
 		}
 	}()
