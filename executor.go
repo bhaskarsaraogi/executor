@@ -3,9 +3,7 @@ package executor
 import (
 	"log"
 	"github.com/pkg/errors"
-	"io"
-	"fmt"
-	"crypto/rand"
+	"github.com/google/uuid"
 )
 
 
@@ -19,13 +17,13 @@ var JobQueue = make(chan Job)
 
 // Worker represents the worker that executes the job
 type Worker struct {
-	Id string
-	WorkerPool  chan chan Job
-	JobChannel  chan Job
-	quit    	chan struct{}
+	Id uuid.UUID // unique Id of every worker
+	WorkerPool  chan chan Job // fixme comment
+	JobChannel  chan Job // fixme comment
+	quit    	chan struct{} // channel to notify worker to stop
 }
 
-func NewWorker(id string, workerPool chan chan Job) *Worker {
+func NewWorker(id uuid.UUID, workerPool chan chan Job) *Worker {
 	return &Worker{
 		Id: id,
 		WorkerPool: workerPool,
@@ -58,7 +56,7 @@ func (w Worker) Start() {
 }
 
 func (w *Worker) String() string {
-	return w.Id
+	return w.Id.String()
 }
 
 // Stop signals the worker to stop listening for work requests.
@@ -88,7 +86,8 @@ func NewExecutor(workers int) *Executor {
 func (e *Executor) Run() {
 	// starting n number of workers
 	for i := 1; i <= e.WorkerCount; i++ {
-		worker := NewWorker(newUUID(), e.WorkerPool)
+		uuid, _ := uuid.NewUUID() // fixme error case in UUID generation
+		worker := NewWorker(uuid, e.WorkerPool)
 		e.Workers = append(e.Workers, worker)
 		worker.Start()
 	}
@@ -121,6 +120,7 @@ func (e *Executor) dispatchJob() {
 func (e *Executor) pushToWorker(job Job) {
 
 	// recover from panic if job channel is closed while pushing the job
+	// fixme its a bad construct but reason why we need this
 	defer func() {
 		if recover() != nil {
 			log.Println("Error occured pushing to job channel, retry!")
@@ -130,6 +130,7 @@ func (e *Executor) pushToWorker(job Job) {
 
 	// try to obtain a worker job channel that is available.
 	// this will block until a worker is idle
+	// fixme what happens when all workers are blocked for a long time, maybe we need to add timeout on job/executor level ?
 	jobChannel := <-e.WorkerPool
 
 	// dispatchJob the job to the worker job channel
@@ -143,7 +144,7 @@ func (e *Executor) QueueJob(job Job)  {
 
 // rescale the executor worker pool
 func (e *Executor) ReScale(workers int) error {
-	// TODO add any given point of time not more than one call to this should be allowed
+	// fixme add any given point of time not more than one call to this should be allowed
 
 	if workers <= 0 {
 		return errors.New("Inavlid value for workers")
@@ -155,7 +156,8 @@ func (e *Executor) ReScale(workers int) error {
 			log.Println("Scaling up workers")
 
 			for i := e.WorkerCount; i < e.WorkerCount+ (workers- e.WorkerCount); i++ {
-				worker := NewWorker(newUUID(), e.WorkerPool)
+				uuid, _ := uuid.NewUUID() // fixme error case in UUID generation
+				worker := NewWorker(uuid, e.WorkerPool)
 				e.Workers = append(e.Workers, worker)
 				worker.Start()
 			}
@@ -178,23 +180,10 @@ func (e *Executor) ReScale(workers int) error {
 		}
 
 		// set the new worker count after resize
+		// fixme should be atomic with above for loop isnt it ?
 		e.WorkerCount = workers
 
 	}
 	return nil
 }
 
-
-// newUUID generates a random UUID according to RFC 4122
-func newUUID() string {
-	uuid := make([]byte, 16)
-	n, err := io.ReadFull(rand.Reader, uuid)
-	if n != len(uuid) || err != nil {
-		return newUUID()
-	}
-	// variant bits; see section 4.1.1
-	uuid[8] = uuid[8]&^0xc0 | 0x80
-	// version 4 (pseudo-random); see section 4.1.3
-	uuid[6] = uuid[6]&^0xf0 | 0x40
-	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:])
-}

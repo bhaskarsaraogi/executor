@@ -51,7 +51,7 @@ func main()  {
 }
 func info() {
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second * 10)
+	time.Sleep(time.Second * 5)
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
 }
 

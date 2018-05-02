@@ -3,6 +3,8 @@
 [ ] complete examples
 [ ] make library generic
 [ ] add golang doc
-[x] add method to scale up and scale down workers
+[ ] fix method to scale up and scale down workers
 [ ] add test
 [x] close job queue channel if quit
+[ ] benchmark
+[ ] signal capability
