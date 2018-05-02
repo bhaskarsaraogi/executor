@@ -51,7 +51,7 @@ func main()  {
 }
 func info() {
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 5)
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
 }
 
@@ -59,6 +59,7 @@ func spawnJobs(ex *executor.Executor) {
 	for {
 		// Push the job onto the queue.
 		ex.QueueJob(new(dummyJobType))
+		time.Sleep(time.Second)
 
 		// fixme send quit signal here
 	}

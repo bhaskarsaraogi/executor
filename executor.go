@@ -52,8 +52,10 @@ func (e *Executor) Abort() {
 func (e *Executor) dispatchJob() {
 	for {
 		select {
+		// a job request has been received
 		case job := <-JobQueue:
-			// a job request has been received
+			// as more and more pushToWorker are blocked because of contention in workerpool, lot of go routines can get spawned
+			// fixme need to have some form of efficient auto scale up/down, like congestion control
 			go e.pushToWorker(job)
 		}
 	}
@@ -86,7 +88,7 @@ func (e *Executor) QueueJob(job Job)  {
 
 // rescale the executor worker pool
 func (e *Executor) ReScale(workers int) error {
-	// fixme add any given point of time not more than one call to this should be allowed
+	// fixme add any given point of time not more than one call to this should be allowed, make it atomic
 
 	if workers <= 0 {
 		return errors.New("Inavlid value for workers")
