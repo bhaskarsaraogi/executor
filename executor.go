@@ -6,71 +6,13 @@ import (
 	"github.com/google/uuid"
 )
 
-
-// Job represents the job to be run
-type Job interface {
-	Execute(params ...struct{}) error
-}
-
 // A buffered channel that we can send work requests on.
-var JobQueue = make(chan Job)
-
-// Worker represents the worker that executes the job
-type Worker struct {
-	Id uuid.UUID // unique Id of every worker
-	WorkerPool  chan chan Job // fixme comment
-	JobChannel  chan Job // fixme comment
-	quit    	chan struct{} // channel to notify worker to stop
-}
-
-func NewWorker(id uuid.UUID, workerPool chan chan Job) *Worker {
-	return &Worker{
-		Id: id,
-		WorkerPool: workerPool,
-		JobChannel: make(chan Job),
-		quit:       make(chan struct{})}
-}
-
-// Start method starts the run loop for the worker, listening for a quit channel in
-// case we need to stop it
-func (w Worker) Start() {
-	go func() {
-		for {
-			// register the current worker into the worker queue.
-			w.WorkerPool <- w.JobChannel
-
-			select {
-			case job := <-w.JobChannel:
-				// we have received a work request.
-				if err := job.Execute(); err != nil {
-					log.Printf("Error executing job: %s\n", err.Error())
-				}
-
-			case <-w.quit:
-				// we have received a signal to stop
-				close(w.JobChannel)
-				return
-			}
-		}
-	}()
-}
-
-func (w *Worker) String() string {
-	return w.Id.String()
-}
-
-// Stop signals the worker to stop listening for work requests.
-func (w Worker) Stop() {
-	go func() {
-		log.Println("Stopping: ", w.Id)
-		close(w.quit)
-	}()
-}
+var JobQueue = make(JobChannel)
 
 // Core executor struct, has a WorkerPool channel of all currently available workers as all active workers would have published there JobChannel into the WorkerPool to get next job
 type Executor struct {
 	// A pool of workers channels that are registered with the dispatcher
-	WorkerPool  chan chan Job
+	WorkerPool  WorkerPool
 	WorkerCount int
 	Workers     []*Worker
 }
@@ -78,7 +20,7 @@ type Executor struct {
 // Create new executor instance
 // maxWorkers specify the number of workers/agents(underneath goroutines) one would like to spawn, general idea to have as many as the number of cpu available
 func NewExecutor(workers int) *Executor {
-	pool := make(chan chan Job, workers)
+	pool := make(WorkerPool, workers) // buffered channel of workers, why ?
 	return &Executor{WorkerPool: pool, WorkerCount: workers}
 }
 
