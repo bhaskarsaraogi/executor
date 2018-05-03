@@ -8,8 +8,8 @@ import (
 // Core executor struct, has a WorkerPool channel of all currently available workers as all active workers would have published there JobChannel into the WorkerPool to get next job
 type Executor struct {
 	// A pool of workers channels that are registered with the dispatcher
-	WorkerPool  WorkerPool
-	JobQueue JobChannel // A buffered channel that we can send work requests on
+	JobQueue JobChannel // A channel that we can send work requests on
+	JobWrapperChannel JobWrapperChannel // Channel on which all executed jobs are sent by all workers
 	WorkerCount int
 	Workers     []*Worker
 }
@@ -17,22 +17,35 @@ type Executor struct {
 // Create new executor instance
 // maxWorkers specify the number of workers/agents(underneath goroutines) one would like to spawn, general idea to have as many as the number of cpu available
 func NewExecutor(workers int) *Executor {
-	pool := make(WorkerPool, workers) // buffered channel of workers, why ?
-	return &Executor{WorkerPool: pool, WorkerCount: workers}
+	return &Executor{JobQueue: make(JobChannel), JobWrapperChannel: make(JobWrapperChannel), WorkerCount: workers}
 }
 
 // Start all workers on executor
 func (e *Executor) Run() {
 	// starting n number of workers
 	for i := 1; i <= e.WorkerCount; i++ {
-		worker := NewWorker(&e.WorkerPool, &e.JobQueue)
-		e.Workers = append(e.Workers, worker)
+		worker := NewWorker(&e.JobQueue, &e.JobWrapperChannel) // Get pointer to a worker instance
+		e.Workers = append(e.Workers, worker) // Append worker instance pointer to slick of pointers to worker instances
 		worker.Start()
 	}
 }
 
 
 // Stop all workers on execute
+// Gracefully stop all operation
+func (e *Executor) Stop() {
+
+	// Stop all workers
+	for _, worker := range e.Workers {
+		log.Println("Stopping worker")
+		worker.Stop()
+	}
+}
+
+
+// Stop all workers on execute
+// Hard instant shutdown
+// fixme
 func (e *Executor) Abort() {
 
 	// Stop all workers
@@ -61,7 +74,7 @@ func (e *Executor) ReScale(workers int) error {
 			log.Println("Scaling up workers")
 
 			for i := e.WorkerCount; i < e.WorkerCount+ (workers- e.WorkerCount); i++ {
-				worker := NewWorker(&e.WorkerPool, &e.JobQueue)
+				worker := NewWorker(&e.JobQueue, &e.JobWrapperChannel)
 				e.Workers = append(e.Workers, worker)
 				worker.Start()
 			}

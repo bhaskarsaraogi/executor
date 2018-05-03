@@ -8,18 +8,18 @@ import (
 // Worker represents the worker that executes the job
 type Worker struct {
 	Id uuid.UUID // unique Id of every worker
-	WorkerPool  *WorkerPool // represents the worker pool this worker belongs to
 	JobChannel  *JobChannel // jobchannel of worker on which it receives job to execute
+	JobWrapperChannel *JobWrapperChannel
 	quit    	chan struct{} // channel to notify worker to stop
 }
 
 // Create new worker using provided UUID, and the worker pool it wants to be part of
-func NewWorker(workerPool *WorkerPool, jobChannel *JobChannel) *Worker {
+func NewWorker(jobChannel *JobChannel, jobWrapperChannel *JobWrapperChannel) *Worker {
 	uuid, _ := uuid.NewUUID()
 	return &Worker{
 		Id: uuid,
-		WorkerPool: workerPool,
 		JobChannel: jobChannel,
+		JobWrapperChannel: jobWrapperChannel,
 		quit:       make(chan struct{})}
 }
 
@@ -34,7 +34,8 @@ func (w Worker) Start() {
 				case <-w.quit:
 					return
 				case job := <-*w.JobChannel:
-					job.Execute()
+					jobOutput, err := job.Execute()
+					*w.JobWrapperChannel <- &JobWrapper{Job:job, JobOutput:jobOutput, err:err}
 			}
 		}
 	}()
