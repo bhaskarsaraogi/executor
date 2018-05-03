@@ -3,6 +3,8 @@ package executor
 import (
 	"github.com/google/uuid"
 	"log"
+	"sync/atomic"
+	"sync"
 )
 
 // Worker represents the worker that executes the job
@@ -11,6 +13,7 @@ type Worker struct {
 	JobChannel  *JobChannel // jobchannel of worker on which it receives job to execute
 	JobWrapperChannel *JobWrapperChannel
 	quit    	chan struct{} // channel to notify worker to stop
+	active int32
 }
 
 // Create new worker using provided UUID, and the worker pool it wants to be part of
@@ -25,25 +28,28 @@ func NewWorker(jobChannel *JobChannel, jobWrapperChannel *JobWrapperChannel) *Wo
 
 // Start method starts the run loop for the worker, listening for a quit channel in
 // case we need to stop it
-func (w Worker) Start() {
+func (w Worker) Start(wg sync.WaitGroup) {
 	go func() {
 
-		// Go over jobs being published and execute, this is fanout, as this jobChannel is Executor jobQueue only
-		for {
-			select {
-				case <-w.quit:
-					return
-				case job, closed := <-*w.JobChannel:
-					if !closed {
-						log.Println("Closed job channel")
-						return
-					}  else {
-						jobOutput, err := job.Execute()
-						*w.JobWrapperChannel <- &JobWrapper{Job:job, JobOutput:jobOutput, err:err}
-					}
+		wg.Add(1)
+		atomic.StoreInt32(&w.active, 1)
 
+
+		for job := range *w.JobChannel{
+			jobOutput, err := job.Execute()
+			*w.JobWrapperChannel <- &JobWrapper{Job:job, JobOutput:jobOutput, err:err}
+
+			// there might be due to concurrency a job gets consumed, so we need to finish that then only stop this worker
+			if atomic.LoadInt32(&w.active) == 0 {
+				log.Println("Worker quit")
+				wg.Done()
+				return
 			}
 		}
+
+		wg.Done()
+		log.Println("Closed job channel")
+
 	}()
 }
 
@@ -55,8 +61,5 @@ func (w *Worker) String() string {
 // Stop signals the worker to stop listening for work requests.
 func (w Worker) Stop() {
 	// Go routine because dont want to keep other guys waiting while stopping this
-	go func() {
-		log.Println("Stopping: ", w.Id)
-		close(w.quit)
-	}()
+	atomic.StoreInt32(&w.active, 0)
 }

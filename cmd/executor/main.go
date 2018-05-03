@@ -73,17 +73,22 @@ func info(jobCount *int, jobExecutedCount *int) {
 func spawnJobs(ex *executor.Executor, quit *chan struct{}, jobCount *int) {
 	for {
 		// Push the job onto the queue.
-		ex.QueueJob(new(dummyJobType))
-		*jobCount++
-		//time.Sleep(10*time.Millisecond)
+		err := ex.QueueJob(new(dummyJobType))
 
-		//select {
-		//	// encountered quit signal to stop spawning jobs
-		//	case <-*quit:
-		//		return
-		//	// continue spawning jobs
-		//	case <-time.After(time.Millisecond):
-		//}
+		if err != nil {
+			log.Println("Error queuing jobs")
+		} else {
+			*jobCount++
+		}
+
+
+		select {
+			// encountered quit signal to stop spawning jobs
+			case <-*quit:
+				return
+			// continue spawning jobs
+			case <-time.After(time.Nanosecond):
+		}
 
 	}
 }
