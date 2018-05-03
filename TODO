@@ -1,10 +1,8 @@
-[ ] refactor/cleanup
 [ ] update readme
+[ ] add golang doc
 [ ] complete examples
 [ ] make library generic
-[ ] add golang doc
 [ ] fix method to scale up and scale down workers
 [ ] add test
-[x] close job queue channel if quit
 [ ] benchmark
 [ ] signal capability

@@ -23,54 +23,73 @@ func main()  {
 	ex.Run()
 	quit := make(chan struct{})
 
-	// Go through each job and queue the individually for the job to be executed
-	go spawnJobs(ex, &quit)
+	jobCount := 0
+	jobExecutedCount := 0
 
-	info()
+	// Go through each job and queue the individually for the job to be executed
+	go spawnJobs(ex, &quit, &jobCount)
+	go consumeExecutedJobs(ex, &jobExecutedCount)
+
+	info(&jobCount, &jobExecutedCount)
 
 	ex.ReScale(2)
-	info()
+	info(&jobCount, &jobExecutedCount)
 
 	ex.ReScale(4)
-	info()
+	info(&jobCount, &jobExecutedCount)
 
 	ex.ReScale(8)
-	info()
+	info(&jobCount, &jobExecutedCount)
 
 	ex.ReScale(6)
-	info()
+	info(&jobCount, &jobExecutedCount)
 
 	ex.ReScale(3)
-	info()
+	info(&jobCount, &jobExecutedCount)
 
 	ex.ReScale(1)
-	info()
+	info(&jobCount, &jobExecutedCount)
 
 	close(quit)
 	log.Println("Quit spawning jobs")
-	ex.Abort()
+	ex.Stop()
 
 	log.Println("Sent quit signal")
+
+	time.Sleep(100*time.Millisecond)
+
+	log.Printf("Total jobs queued %d\n", jobCount)
+
+	log.Printf("Total jobs executed %d\n", jobExecutedCount)
 }
-func info() {
+func info(jobCount *int, jobExecutedCount *int) {
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
 	time.Sleep(time.Second * 3)
 	log.Println("GOROUTINES: ", runtime.NumGoroutine())
+	log.Printf("Total jobs queued %d\n", *jobCount)
+	log.Printf("Total jobs executed %d\n", *jobExecutedCount)
 }
 
-func spawnJobs(ex *executor.Executor, quit *chan struct{}) {
+func spawnJobs(ex *executor.Executor, quit *chan struct{}, jobCount *int) {
 	for {
 		// Push the job onto the queue.
 		ex.QueueJob(new(dummyJobType))
+		*jobCount++
 		//time.Sleep(10*time.Millisecond)
 
-		select {
-			// encountered quit signal to stop spawning jobs
-			case <-*quit:
-				return
-			// continue spawning jobs
-			case <-time.After(time.Millisecond):
-		}
+		//select {
+		//	// encountered quit signal to stop spawning jobs
+		//	case <-*quit:
+		//		return
+		//	// continue spawning jobs
+		//	case <-time.After(time.Millisecond):
+		//}
 
+	}
+}
+
+func consumeExecutedJobs(ex *executor.Executor, jobExecutedCount *int) {
+	for range ex.JobWrapperChannel {
+		*jobExecutedCount++
 	}
 }

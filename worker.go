@@ -28,14 +28,20 @@ func NewWorker(jobChannel *JobChannel, jobWrapperChannel *JobWrapperChannel) *Wo
 func (w Worker) Start() {
 	go func() {
 
-		// Go over jobs being published and excute, this is fanout, as this jobChannel is Executor jobQueue only
+		// Go over jobs being published and execute, this is fanout, as this jobChannel is Executor jobQueue only
 		for {
 			select {
 				case <-w.quit:
 					return
-				case job := <-*w.JobChannel:
-					jobOutput, err := job.Execute()
-					*w.JobWrapperChannel <- &JobWrapper{Job:job, JobOutput:jobOutput, err:err}
+				case job, closed := <-*w.JobChannel:
+					if !closed {
+						log.Println("Closed job channel")
+						return
+					}  else {
+						jobOutput, err := job.Execute()
+						*w.JobWrapperChannel <- &JobWrapper{Job:job, JobOutput:jobOutput, err:err}
+					}
+
 			}
 		}
 	}()
@@ -48,6 +54,7 @@ func (w *Worker) String() string {
 
 // Stop signals the worker to stop listening for work requests.
 func (w Worker) Stop() {
+	// Go routine because dont want to keep other guys waiting while stopping this
 	go func() {
 		log.Println("Stopping: ", w.Id)
 		close(w.quit)

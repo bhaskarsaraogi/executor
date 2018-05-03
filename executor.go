@@ -36,10 +36,13 @@ func (e *Executor) Run() {
 func (e *Executor) Stop() {
 
 	// Stop all workers
+	close(e.JobQueue) // Close the job queue to prevent further pushing of jobs
+	// fixme mark the executor closed/unavailable to take more jobs
 	for _, worker := range e.Workers {
 		log.Println("Stopping worker")
 		worker.Stop()
 	}
+	close(e.JobWrapperChannel)
 }
 
 
@@ -56,6 +59,7 @@ func (e *Executor) Abort() {
 }
 
 // push job to the global JobQueue or bus
+// fixme currently this will panic once the channel is closed for further pushing, have a active state on executor ?
 func (e *Executor) QueueJob(job Job)  {
 	e.JobQueue <- job
 }
