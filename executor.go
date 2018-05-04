@@ -31,7 +31,7 @@ func (e *Executor) Run() {
 	for i := 1; i <= e.WorkerCount; i++ {
 		worker := NewWorker(&e.JobQueue, &e.JobWrapperChannel) // Get pointer to a worker instance
 		e.Workers = append(e.Workers, worker) // Append worker instance pointer to slick of pointers to worker instances
-		worker.Start(e.wg)
+		worker.Start(&e.wg)
 	}
 }
 
@@ -46,23 +46,36 @@ func (e *Executor) Stop() {
 	// Closing this queue will stop all the workers eventually as they are done processing message
 	log.Println("Closing job queue")
 	close(e.JobQueue)
+	// As soon as the jobqueue is closed all the workers will exit after processing the pending jobs
+	// So wait for the workers to finish
 	log.Println("Waiting on workers to finish")
 	e.wg.Wait()
 	log.Println("All workers exited")
+	// Since all job processing are done and all workers have exited, closed the job output channel
 	close(e.JobWrapperChannel)
 }
 
 
 // Stop all workers on execute
 // Hard instant shutdown
-// fixme
+// This will stop the workers instantly after processing whatever job they are doing
 func (e *Executor) Abort() {
+
+	// Stop all workers
+	atomic.StoreInt32(&e.active, 0) // mark executor inactive to take further jobs
+	// Close the job queue to prevent further pushing of jobs
+	// Closing this queue will stop all the workers eventually as they are done processing message
+	log.Println("Closing job queue")
+	close(e.JobQueue)
 
 	// Stop all workers
 	for _, worker := range e.Workers {
 		log.Println("Stopping worker")
 		worker.Stop()
 	}
+
+	e.wg.Wait()
+	close(e.JobWrapperChannel)
 }
 
 // push job to the global JobQueue or bus
@@ -101,7 +114,7 @@ func (e *Executor) ReScale(workers int) error {
 			for i := e.WorkerCount; i < e.WorkerCount+ (workers- e.WorkerCount); i++ {
 				worker := NewWorker(&e.JobQueue, &e.JobWrapperChannel)
 				e.Workers = append(e.Workers, worker)
-				worker.Start(e.wg)
+				worker.Start(&e.wg)
 			}
 
 		} else {

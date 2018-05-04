@@ -15,6 +15,7 @@ type dummyJobType struct {
 // the argument is variadic to provide flexibility to add external params needed for execution of job
 func (d dummyJobType) Execute(...struct{}) (*struct{}, error) {
 	//log.Println("Task executed")
+	time.Sleep(time.Millisecond)
 	return nil, nil
 }
 
@@ -52,7 +53,8 @@ func main()  {
 
 	close(quit)
 	log.Println("Quit spawning jobs")
-	ex.Stop()
+	//ex.Stop()
+	ex.Abort()
 
 	log.Println("Sent quit signal")
 
@@ -76,7 +78,7 @@ func spawnJobs(ex *executor.Executor, quit *chan struct{}, jobCount *int) {
 		err := ex.QueueJob(new(dummyJobType))
 
 		if err != nil {
-			log.Println("Error queuing jobs")
+			//log.Println("Error queuing jobs")
 		} else {
 			*jobCount++
 		}

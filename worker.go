@@ -28,12 +28,11 @@ func NewWorker(jobChannel *JobChannel, jobWrapperChannel *JobWrapperChannel) *Wo
 
 // Start method starts the run loop for the worker, listening for a quit channel in
 // case we need to stop it
-func (w Worker) Start(wg sync.WaitGroup) {
+func (w *Worker) Start(wg *sync.WaitGroup) {
 	go func() {
 
 		wg.Add(1)
 		atomic.StoreInt32(&w.active, 1)
-
 
 		for job := range *w.JobChannel{
 			jobOutput, err := job.Execute()
@@ -46,10 +45,8 @@ func (w Worker) Start(wg sync.WaitGroup) {
 				return
 			}
 		}
-
-		wg.Done()
 		log.Println("Closed job channel")
-
+		wg.Done()
 	}()
 }
 
@@ -59,7 +56,7 @@ func (w *Worker) String() string {
 }
 
 // Stop signals the worker to stop listening for work requests.
-func (w Worker) Stop() {
+func (w *Worker) Stop() {
 	// Go routine because dont want to keep other guys waiting while stopping this
 	atomic.StoreInt32(&w.active, 0)
 }
